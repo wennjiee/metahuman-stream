@@ -3,6 +3,8 @@ Real time interactive streaming digital human， realize audio video synchronous
 
 [ernerf效果](https://www.bilibili.com/video/BV1PM4m1y7Q2/)  [musetalk效果](https://www.bilibili.com/video/BV1gm421N7vQ/)  [wav2lip效果](https://www.bilibili.com/video/BV1Bw4m1e74P/)
 
+## 为避免与3d数字人混淆，原项目metahuman-stream改名为livetalking，原有链接地址继续可用
+
 ## Features
 1. 支持多种数字人模型: ernerf、musetalk、wav2lip
 2. 支持声音克隆
@@ -22,21 +24,21 @@ conda create -n nerfstream python=3.10
 conda activate nerfstream
 conda install pytorch==1.12.1 torchvision==0.13.1 cudatoolkit=11.3 -c pytorch
 pip install -r requirements.txt
-#如果只用musetalk或者wav2lip模型，不需要安装下面的库
+#如果不训练ernerf模型，不需要安装下面的库
 pip install "git+https://github.com/facebookresearch/pytorch3d.git"
 pip install tensorflow-gpu==2.8.0
 pip install --upgrade "protobuf<=3.20.1"
 ```
-如果用pytorch2.1，torchvision用0.16（可以去torchvision官网根据pytorch版本找匹配的）,cudatoolkit可以不用装  
-安装常见问题[FAQ](/assets/faq.md)  
+如果cuda为其他版本，上<https://pytorch.org/get-started/previous-versions/>安装相应版本的pytorch  
+安装常见问题[FAQ](https://livetalking-doc.readthedocs.io/en/latest/faq.html)  
 linux cuda环境搭建可以参考这篇文章 https://zhuanlan.zhihu.com/p/674972886
 
 
 ## 2. Quick Start
 默认采用ernerf模型，webrtc推流到srs  
 ### 2.1 运行srs
-```
-export CANDIDATE='<服务器外网ip>'
+```bash
+export CANDIDATE='<服务器外网ip>'  #如果srs与浏览器访问在同一层级内网，不需要执行这步
 docker run --rm --env CANDIDATE=$CANDIDATE \
   -p 1935:1935 -p 8080:8080 -p 1985:1985 -p 8000:8000/udp \
   registry.cn-hangzhou.aliyuncs.com/ossrs/srs:5 \
@@ -67,14 +69,16 @@ docker run --gpus all -it --network=host --rm registry.cn-beijing.aliyuncs.com/c
 ```
 代码在/root/metahuman-stream，先git pull拉一下最新代码，然后执行命令同第2、3步 
 
-另外提供autodl镜像: <https://www.codewithgpu.com/i/lipku/metahuman-stream/base>   
+提供如下镜像
+- autodl镜像: <https://www.codewithgpu.com/i/lipku/metahuman-stream/base>   
 [autodl教程](autodl/README.md)
+- ucloud镜像: <https://www.compshare.cn/images-detail?ImageID=compshareImage-14pa8x8ucwr9&ImageType=Community&ytag=cs_lipku_image>  
+可以开放任意端口，不需要单独运行srs服务.
 
 
 ## 5. 性能分析
 1. 帧率  
-在Tesla T4显卡上测试整体fps为18左右，如果去掉音视频编码推流，帧率在20左右。用4090显卡可以达到40多帧/秒。  
-优化：新开一个线程运行音视频编码推流  
+在Tesla T4显卡上测试整体fps为18左右，如果去掉音视频编码推流，帧率在20左右。用4090显卡可以达到40多帧/秒。    
 2. 延时  
 整体延时3s左右  
 （1）tts延时1.7s左右，目前用的edgetts，需要将每句话转完后一次性输入，可以优化tts改成流式输入  

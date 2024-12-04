@@ -189,17 +189,6 @@ class MuseReal(BaseReal):
         input_mask_list = glob.glob(os.path.join(self.mask_out_path, '*.[jpJP][pnPN]*[gG]'))
         input_mask_list = sorted(input_mask_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
         self.mask_list_cycle = read_imgs(input_mask_list)
-        
-    
-    def put_msg_txt(self,msg):
-        self.tts.put_msg_txt(msg)
-    
-    def put_audio_frame(self,audio_chunk): #16khz 20ms pcm
-        self.asr.put_audio_frame(audio_chunk)
-
-    def pause_talk(self):
-        self.tts.pause_talk()
-        self.asr.pause_talk()
     
 
     def __mirror_index(self, index):
@@ -243,6 +232,7 @@ class MuseReal(BaseReal):
             except queue.Empty:
                 continue
             if audio_frames[0][1]!=0 and audio_frames[1][1]!=0: #全为静音数据，只需要取fullimg
+                self.speaking = False
                 audiotype = audio_frames[0][1]
                 if self.custom_index.get(audiotype) is not None: #有自定义视频
                     mirindex = self.mirror_index(len(self.custom_img_cycle[audiotype]),self.custom_index[audiotype])
@@ -253,6 +243,7 @@ class MuseReal(BaseReal):
                 else:
                     combine_frame = self.frame_list_cycle[idx]
             else:
+                self.speaking = True
                 bbox = self.coord_list_cycle[idx]
                 ori_frame = copy.deepcopy(self.frame_list_cycle[idx])
                 x1, y1, x2, y2 = bbox
@@ -269,7 +260,9 @@ class MuseReal(BaseReal):
 
             image = combine_frame #(outputs['image'] * 255).astype(np.uint8)
             new_frame = VideoFrame.from_ndarray(image, format="bgr24")
-            asyncio.run_coroutine_threadsafe(video_track._queue.put(new_frame), loop) 
+            asyncio.run_coroutine_threadsafe(video_track._queue.put(new_frame), loop)
+            self.record_video_data(image)
+            #self.recordq_video.put(new_frame)  
 
             for audio_frame in audio_frames:
                 frame,type = audio_frame
@@ -280,6 +273,8 @@ class MuseReal(BaseReal):
                 # if audio_track._queue.qsize()>10:
                 #     time.sleep(0.1)
                 asyncio.run_coroutine_threadsafe(audio_track._queue.put(new_frame), loop)
+                self.record_audio_data(frame)
+                #self.recordq_audio.put(new_frame)
         print('musereal process_frames thread stop') 
             
     def render(self,quit_event,loop=None,audio_track=None,video_track=None):
