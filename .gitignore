@@ -17,3 +17,5 @@ pretrained
 workspace/log_ngp.txt
 .idea
 .vscode/*
+*.whl
+zexample/
