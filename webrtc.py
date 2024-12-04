@@ -38,7 +38,7 @@ class PlayerStreamTrack(MediaStreamTrack):
         self.kind = kind
         self._player = player
         self._queue = asyncio.Queue()
-        self.timelist = [] #记录最近包的时间戳
+        self.timelist = [] # 记录最近包的时间戳
         if self.kind == 'video':
             self.framecount = 0
             self.lasttime = time.perf_counter()
@@ -53,7 +53,7 @@ class PlayerStreamTrack(MediaStreamTrack):
 
         if self.kind == 'video':
             if hasattr(self, "_timestamp"):
-                #self._timestamp = (time.time()-self._start) * VIDEO_CLOCK_RATE
+                # self._timestamp = (time.time()-self._start) * VIDEO_CLOCK_RATE
                 self._timestamp += int(VIDEO_PTIME * VIDEO_CLOCK_RATE)
                 wait = self._start + (self._timestamp / VIDEO_CLOCK_RATE) - time.time()
                 # wait = self.timelist[0] + len(self.timelist)*VIDEO_PTIME - time.time()               
@@ -68,13 +68,13 @@ class PlayerStreamTrack(MediaStreamTrack):
                 self.timelist.append(self._start)
                 print('video start:',self._start)
             return self._timestamp, VIDEO_TIME_BASE
-        else: #audio
+        else: # audio
             if hasattr(self, "_timestamp"):
-                #self._timestamp = (time.time()-self._start) * SAMPLE_RATE
+                # self._timestamp = (time.time()-self._start) * SAMPLE_RATE
                 self._timestamp += int(AUDIO_PTIME * SAMPLE_RATE)
                 wait = self._start + (self._timestamp / SAMPLE_RATE) - time.time()
                 # wait = self.timelist[0] + len(self.timelist)*AUDIO_PTIME - time.time()
-                if wait>0:
+                if wait > 0:
                     await asyncio.sleep(wait)
                 # if len(self.timelist)>=200:
                 #     self.timelist.pop(0)
@@ -84,11 +84,11 @@ class PlayerStreamTrack(MediaStreamTrack):
                 self._start = time.time()
                 self._timestamp = 0
                 self.timelist.append(self._start)
-                print('audio start:',self._start)
+                print('audio start:', self._start)
             return self._timestamp, AUDIO_TIME_BASE
 
     async def recv(self) -> Union[Frame, Packet]:
-        # frame = self.frames[self.counter % 30]            
+        # frame = self.frames[self.counter % 30]
         self._player._start(self)
         # if self.kind == 'video':
         #     frame = await self._queue.get()
@@ -117,7 +117,7 @@ class PlayerStreamTrack(MediaStreamTrack):
             self.totaltime += (time.perf_counter() - self.lasttime)
             self.framecount += 1
             self.lasttime = time.perf_counter()
-            if self.framecount==100:
+            if self.framecount == 100:
                 print(f"------actual avg final fps:{self.framecount/self.totaltime:.4f}")
                 self.framecount = 0
                 self.totaltime=0
@@ -129,6 +129,7 @@ class PlayerStreamTrack(MediaStreamTrack):
             self._player._stop(self)
             self._player = None
 
+# async def recv -> self.__thread.start() = media-player
 def player_worker_thread(
     quit_event,
     loop,
@@ -136,7 +137,7 @@ def player_worker_thread(
     audio_track,
     video_track
 ):
-    container.render(quit_event,loop,audio_track,video_track)
+    container.render(quit_event, loop, audio_track, video_track)
 
 class HumanPlayer:
 
@@ -172,14 +173,14 @@ class HumanPlayer:
         return self.__video
 
     def _start(self, track: PlayerStreamTrack) -> None:
-        self.__started.add(track)
+        self.__started.add(track) # self.__started is a Set[PlayerStreamTrack]
         if self.__thread is None:
             self.__log_debug("Starting worker thread")
-            self.__thread_quit = threading.Event()
+            self.__thread_quit = threading.Event() # 事件管理标志
             self.__thread = threading.Thread(
-                name="media-player",
-                target=player_worker_thread,
-                args=(
+                name = "media-player",
+                target = player_worker_thread,
+                args = (
                     self.__thread_quit,
                     asyncio.get_event_loop(),
                     self.__container,
@@ -187,19 +188,20 @@ class HumanPlayer:
                     self.__video                   
                 ),
             )
+            print('self.__thread.start()')
             self.__thread.start()
 
     def _stop(self, track: PlayerStreamTrack) -> None:
-        self.__started.discard(track)
+        self.__started.discard(track) # in which case the code runs to here ?
 
         if not self.__started and self.__thread is not None:
             self.__log_debug("Stopping worker thread")
-            self.__thread_quit.set()
-            self.__thread.join()
+            self.__thread_quit.set() # set event flag True，调用wait方法的线程将被wake, end the ttsreal and nerfreal thread, for while not quit_event.is_set()
+            self.__thread.join() # 阻塞[自身MainThread]的线程，等待self.__thread结束
             self.__thread = None
 
         if not self.__started and self.__container is not None:
-            #self.__container.close()
+            # self.__container.close()
             self.__container = None
 
     def __log_debug(self, msg: str, *args) -> None:

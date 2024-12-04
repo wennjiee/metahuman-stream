@@ -1,5 +1,5 @@
 # server.py
-from flask import Flask, render_template,send_from_directory,request, jsonify
+from flask import Flask, render_template, send_from_directory, request, jsonify
 from flask_sockets import Sockets
 import base64
 import time
@@ -10,7 +10,7 @@ from geventwebsocket.handler import WebSocketHandler
 import os
 import re
 import numpy as np
-from threading import Thread,Event
+from threading import Thread, Event
 import multiprocessing
 
 from aiohttp import web
@@ -172,7 +172,7 @@ async def on_shutdown(app):
 async def post(url,data):
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url,data=data) as response:
+            async with session.post(url, data=data) as response:
                 return await response.text()
     except aiohttp.ClientError as e:
         print(f'Error: {e}')
@@ -189,12 +189,12 @@ async def run(push_url):
             pcs.discard(pc)
 
     player = HumanPlayer(nerfreals[0])
-    audio_sender = pc.addTrack(player.audio)
+    audio_sender = pc.addTrack(player.audio) # 本地音视频数据绑定
     video_sender = pc.addTrack(player.video)
 
-    await pc.setLocalDescription(await pc.createOffer())
-    answer = await post(push_url,pc.localDescription.sdp)
-    await pc.setRemoteDescription(RTCSessionDescription(sdp=answer,type='answer'))
+    await pc.setLocalDescription(await pc.createOffer()) # 设置本地SDP描述信息
+    answer = await post(push_url, pc.localDescription.sdp)
+    await pc.setRemoteDescription(RTCSessionDescription(sdp=answer, type='answer')) # 设置远端SDP描述信息，接收到远端发来的SDP信息后使用本方法
 ##########################################
 # os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 # os.environ['MULTIPROCESSING_METHOD'] = 'forkserver'                                                    
@@ -291,7 +291,7 @@ if __name__ == '__main__':
     parser.add_argument('--asr_wav', type=str, default='', help="load the wav and use as input")
     parser.add_argument('--asr_play', action='store_true', help="play out the audio")
 
-    #parser.add_argument('--asr_model', type=str, default='deepspeech')
+    # parser.add_argument('--asr_model', type=str, default='deepspeech')
     parser.add_argument('--asr_model', type=str, default='cpierse/wav2vec2-large-xlsr-53-esperanto') #
     # parser.add_argument('--asr_model', type=str, default='facebook/wav2vec2-large-960h-lv60-self')
     # parser.add_argument('--asr_model', type=str, default='facebook/hubert-large-ls960-ft')
@@ -353,7 +353,7 @@ if __name__ == '__main__':
         # assert test mode
         opt.test = True
         opt.test_train = False
-        #opt.train_camera =True
+        # opt.train_camera = True
         # explicit smoothing
         opt.smooth_path = True
         opt.smooth_lips = True
@@ -366,7 +366,7 @@ if __name__ == '__main__':
         opt.exp_eye = True
         opt.smooth_eye = True
 
-        if opt.torso_imgs=='': #no img,use model output
+        if opt.torso_imgs == '': #no img,use model output
             opt.torso = True
 
         # assert opt.cuda_ray, "Only support CUDA ray mode."
@@ -383,7 +383,7 @@ if __name__ == '__main__':
 
         criterion = torch.nn.MSELoss(reduction='none')
         metrics = [] # use no metric in GUI for faster initialization...
-        print(model)
+        # print(model)
         trainer = Trainer('ngp', opt, model, device=device, workspace=opt.workspace, criterion=criterion, fp16=opt.fp16, metrics=metrics, use_checkpoint=opt.ckpt)
 
         test_loader = NeRFDataset_Test(opt, device=device).dataloader()
@@ -410,9 +410,9 @@ if __name__ == '__main__':
     for _ in range(opt.max_session):
         statreals.append(0)
 
-    if opt.transport=='rtmp':
+    if opt.transport == 'rtmp':
         thread_quit = Event()
-        rendthrd = Thread(target=nerfreals[0].render,args=(thread_quit,))
+        rendthrd = Thread(target=nerfreals[0].render, args=(thread_quit,))
         rendthrd.start()
 
     #############################################################################
@@ -421,35 +421,35 @@ if __name__ == '__main__':
     appasync.router.add_post("/offer", offer)
     appasync.router.add_post("/human", human)
     appasync.router.add_post("/set_audiotype", set_audiotype)
-    appasync.router.add_static('/',path='web')
+    appasync.router.add_static('/', path='web')
 
     # Configure default CORS settings.
-    cors = aiohttp_cors.setup(appasync, defaults={
+    cors = aiohttp_cors.setup(appasync, defaults = {
             "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
+                expose_headers = "*",
+                allow_headers = "*",
             )
         })
     # Configure CORS on all routes.
     for route in list(appasync.router.routes()):
         cors.add(route)
-
-    pagename='webrtcapi.html'
-    if opt.transport=='rtmp':
-        pagename='echoapi.html'
-    elif opt.transport=='rtcpush':
-        pagename='rtcpushapi.html'
-    print('start http server; http://<serverip>:'+str(opt.listenport)+'/'+pagename)
+    # default='rtcpush'
+    pagename = 'webrtcapi.html'
+    if opt.transport == 'rtmp':
+        pagename = 'echoapi.html'
+    elif opt.transport == 'rtcpush':
+        pagename = 'rtcpushapi.html'
+    print('start http server; http://<serverip>:' + str(opt.listenport) + '/' + pagename)
     def run_server(runner):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(runner.setup())
+        loop = asyncio.new_event_loop() # 创建一个新的事件循环
+        asyncio.set_event_loop(loop) # 将 loop 设置为当前 OS 线程的当前事件循环
+        loop.run_until_complete(runner.setup()) # 运行直到 future (Future 的实例) 被完成
         site = web.TCPSite(runner, '0.0.0.0', opt.listenport)
         loop.run_until_complete(site.start())
-        if opt.transport=='rtcpush':
+        if opt.transport == 'rtcpush':
             loop.run_until_complete(run(opt.push_url))
-        loop.run_forever()    
+        loop.run_forever() # 运行事件循环直到 stop() 被调用    
     #Thread(target=run_server, args=(web.AppRunner(appasync),)).start()
     run_server(web.AppRunner(appasync))
 

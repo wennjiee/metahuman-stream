@@ -76,7 +76,7 @@ class NeRFReal(BaseReal):
         #self.customimg_index = 0
 
         # build asr
-        self.asr = NerfASR(opt,self)
+        self.asr = NerfASR(opt, self)
         self.asr.warm_up()
         
         '''
@@ -145,7 +145,7 @@ class NeRFReal(BaseReal):
     #     else:
     #         return size - res - 1   
 
-    def test_step(self,loop=None,audio_track=None,video_track=None):
+    def test_step(self, loop=None, audio_track=None, video_track=None):
         
         #starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
         #starter.record()
@@ -164,19 +164,19 @@ class NeRFReal(BaseReal):
         audiotype2 = 0
         #send audio
         for i in range(2):
-            frame,type = self.asr.get_audio_out()
-            if i==0:
+            frame, type = self.asr.get_audio_out()
+            if i == 0:
                 audiotype1 = type
             else:
                 audiotype2 = type
             #print(f'[INFO] get_audio_out shape ',frame.shape)
-            if self.opt.transport=='rtmp':                
+            if self.opt.transport == 'rtmp':                
                 self.streamer.stream_frame_audio(frame)
             else: #webrtc
                 frame = (frame * 32767).astype(np.int16)
                 new_frame = AudioFrame(format='s16', layout='mono', samples=frame.shape[0])
                 new_frame.planes[0].update(frame.tobytes())
-                new_frame.sample_rate=16000
+                new_frame.sample_rate = 16000
                 asyncio.run_coroutine_threadsafe(audio_track._queue.put(new_frame), loop)
 
         # if self.opt.transport=='rtmp':
@@ -210,7 +210,7 @@ class NeRFReal(BaseReal):
             else:
                 new_frame = VideoFrame.from_ndarray(image, format="rgb24")
                 asyncio.run_coroutine_threadsafe(video_track._queue.put(new_frame), loop)
-        else: #推理视频+贴回
+        else: # 推理视频+贴回
             outputs = self.trainer.test_gui_with_data(data, self.W, self.H)
             #print('-------ernerf time: ',time.time()-t)
             #print(f'[INFO] outputs shape ',outputs['image'].shape)
@@ -239,16 +239,16 @@ class NeRFReal(BaseReal):
         #ender.record()
         #torch.cuda.synchronize()
         #t = starter.elapsed_time(ender)
-            
-    def render(self,quit_event,loop=None,audio_track=None,video_track=None):
+    # player_worker_thread        
+    def render(self, quit_event, loop=None, audio_track=None, video_track=None):
         #if self.opt.asr:
         #     self.asr.warm_up()
         
         self.init_customindex()
 
-        if self.opt.transport=='rtmp':
+        if self.opt.transport == 'rtmp':
             from rtmp_streaming import StreamerConfig, Streamer
-            fps=25
+            fps = 25
             #push_url='rtmp://localhost/live/livestream' #'data/video/output_0.mp4'
             sc = StreamerConfig()
             sc.source_width = self.W
@@ -270,34 +270,34 @@ class NeRFReal(BaseReal):
             self.streamer.init(sc)
             #self.streamer.enable_av_debug_log()
 
-        count=0
-        totaltime=0
-        _starttime=time.perf_counter()
-        _totalframe=0
+        count = 0
+        totaltime = 0
+        _starttime = time.perf_counter()
+        _totalframe = 0
 
-        self.tts.render(quit_event)
-        while not quit_event.is_set(): #todo
+        self.tts.render(quit_event) # create a thread named 'process_tts in while not quit_event.is_set()' to convert text2tts 
+        while not quit_event.is_set(): # todo
             # update texture every frame
             # audio stream thread...
             t = time.perf_counter()
             # run 2 ASR steps (audio is at 50FPS, video is at 25FPS)
             for _ in range(2):
                 self.asr.run_step()
-            self.test_step(loop,audio_track,video_track)
+            self.test_step(loop, audio_track, video_track)
             totaltime += (time.perf_counter() - t)
             count += 1
             _totalframe += 1
-            if count==100:
-                print(f"------actual avg infer fps:{count/totaltime:.4f}")
-                count=0
-                totaltime=0
-            if self.opt.transport=='rtmp':
-                delay = _starttime+_totalframe*0.04-time.perf_counter() #40ms
+            if count == 100:
+                print(f"------actual avg infer fps render:{count/totaltime:.4f}")
+                count = 0
+                totaltime = 0
+            if self.opt.transport == 'rtmp':
+                delay = _starttime + _totalframe * 0.04 - time.perf_counter() # 40ms
                 if delay > 0:
                     time.sleep(delay)
             else:
-                if video_track._queue.qsize()>=5:
-                    #print('sleep qsize=',video_track._queue.qsize())
+                if video_track._queue.qsize() >= 5:
+                    # print('sleep qsize=', video_track._queue.qsize())
                     time.sleep(0.04*video_track._queue.qsize()*0.8)
         print('nerfreal thread stop')
             

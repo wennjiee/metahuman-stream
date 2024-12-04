@@ -59,11 +59,11 @@ class BaseReal:
             self.custom_opt[item['audiotype']] = item
 
     def init_customindex(self):
-        self.curr_state=0
+        self.curr_state = 0
         for key in self.custom_audio_index:
-            self.custom_audio_index[key]=0
+            self.custom_audio_index[key] = 0
         for key in self.custom_index:
-            self.custom_index[key]=0
+            self.custom_index[key] = 0
 
     def mirror_index(self,size, index):
         #size = len(self.coord_list_cycle)
