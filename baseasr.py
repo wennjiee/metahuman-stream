@@ -1,9 +1,26 @@
+###############################################################################
+#  Copyright (C) 2024 LiveTalking@lipku https://github.com/lipku/LiveTalking
+#  email: lipku@foxmail.com
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  
+#       http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+###############################################################################
+
 import time
 import numpy as np
 
 import queue
 from queue import Queue
-import multiprocessing as mp
+import torch.multiprocessing as mp
 
 
 class BaseASR:
@@ -27,15 +44,16 @@ class BaseASR:
 
         #self.warm_up()
 
-    def pause_talk(self):
+    def flush_talk(self):
         self.queue.queue.clear()
 
-    def put_audio_frame(self,audio_chunk): #16khz 20ms pcm
-        self.queue.put(audio_chunk)
+    def put_audio_frame(self,audio_chunk,eventpoint=None): #16khz 20ms pcm
+        self.queue.put((audio_chunk,eventpoint))
 
+    #return frame:audio pcm; type: 0-normal speak, 1-silence; eventpoint:custom event sync with audio
     def get_audio_frame(self):        
         try:
-            frame = self.queue.get(block=True,timeout=0.01)
+            frame,eventpoint = self.queue.get(block=True,timeout=0.01)
             type = 0
             #print(f'[INFO] get frame {frame.shape}')
         except queue.Empty:
@@ -45,20 +63,19 @@ class BaseASR:
             else:
                 frame = np.zeros(self.chunk, dtype=np.float32)
                 type = 1
+            eventpoint = None
 
-        return frame,type 
+        return frame,type,eventpoint 
 
-    def is_audio_frame_empty(self)->bool:
-        return self.queue.empty()
-
-    def get_audio_out(self):  #get origin audio pcm to nerf
+    #return frame:audio pcm; type: 0-normal speak, 1-silence; eventpoint:custom event sync with audio
+    def get_audio_out(self): 
         return self.output_queue.get()
     
     def warm_up(self):
         for _ in range(self.stride_left_size + self.stride_right_size):
-            audio_frame,type=self.get_audio_frame()
+            audio_frame,type,eventpoint=self.get_audio_frame()
             self.frames.append(audio_frame)
-            self.output_queue.put((audio_frame,type))
+            self.output_queue.put((audio_frame,type,eventpoint))
         for _ in range(self.stride_left_size):
             self.output_queue.get()
 

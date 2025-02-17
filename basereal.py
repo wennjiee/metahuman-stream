@@ -1,3 +1,20 @@
+###############################################################################
+#  Copyright (C) 2024 LiveTalking@lipku https://github.com/lipku/LiveTalking
+#  email: lipku@foxmail.com
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  
+#       http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+###############################################################################
+
 import math
 import torch
 import numpy as np
@@ -7,8 +24,6 @@ import os
 import time
 import cv2
 import glob
-import pickle
-import copy
 import resampy
 
 import queue
@@ -20,7 +35,7 @@ import soundfile as sf
 import av
 from fractions import Fraction
 
-from ttsreal import EdgeTTS,VoitsTTS,XTTS,CosyVoiceTTS
+from ttsreal import EdgeTTS,VoitsTTS,XTTS,CosyVoiceTTS,FishTTS
 
 from tqdm import tqdm
 def read_imgs(img_list):
@@ -36,6 +51,7 @@ class BaseReal:
         self.opt = opt
         self.sample_rate = 16000
         self.chunk = self.sample_rate // opt.fps # 320 samples per chunk (20ms * 16000 / 1000)
+        self.sessionid = self.opt.sessionid
 
         if opt.tts == "edgetts":
             self.tts = EdgeTTS(opt,self)
@@ -45,6 +61,8 @@ class BaseReal:
             self.tts = XTTS(opt,self)
         elif opt.tts == "cosyvoice":
             self.tts = CosyVoiceTTS(opt,self)
+        elif opt.tts == "fishtts":
+            self.tts = FishTTS(opt,self)
         
         self.speaking = False
 
@@ -61,11 +79,11 @@ class BaseReal:
         self.custom_opt = {}
         self.__loadcustom()
 
-    def put_msg_txt(self,msg):
-        self.tts.put_msg_txt(msg)
+    def put_msg_txt(self,msg,eventpoint=None):
+        self.tts.put_msg_txt(msg,eventpoint)
     
-    def put_audio_frame(self,audio_chunk): #16khz 20ms pcm
-        self.asr.put_audio_frame(audio_chunk)
+    def put_audio_frame(self,audio_chunk,eventpoint=None): #16khz 20ms pcm
+        self.asr.put_audio_frame(audio_chunk,eventpoint)
 
     def put_audio_file(self,filebyte): 
         input_stream = BytesIO(filebyte)
@@ -93,9 +111,9 @@ class BaseReal:
 
         return stream
 
-    def pause_talk(self):
-        self.tts.pause_talk()
-        self.asr.pause_talk()
+    def flush_talk(self):
+        self.tts.flush_talk()
+        self.asr.flush_talk()
 
     def is_speaking(self)->bool:
         return self.speaking
@@ -117,6 +135,9 @@ class BaseReal:
             self.custom_audio_index[key] = 0
         for key in self.custom_index:
             self.custom_index[key] = 0
+
+    def notify(self,eventpoint):
+        print("notify:",eventpoint)
 
     def start_recording(self):
         """开始录制视频"""

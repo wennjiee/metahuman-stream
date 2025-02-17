@@ -1,19 +1,33 @@
+###############################################################################
+#  Copyright (C) 2024 LiveTalking@lipku https://github.com/lipku/LiveTalking
+#  email: lipku@foxmail.com
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#  
+#       http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+###############################################################################
+
 import time
 import numpy as np
 import torch
 import torch.nn.functional as F
-from transformers import AutoModelForCTC, AutoProcessor, Wav2Vec2Processor, HubertModel
-
 
 import queue
 from queue import Queue
 #from collections import deque
-from threading import Thread, Event
 
 from baseasr import BaseASR
 
 class NerfASR(BaseASR):
-    def __init__(self, opt, parent):
+    def __init__(self, opt, parent, audio_processor,audio_model):
         super().__init__(opt,parent)
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -37,13 +51,15 @@ class NerfASR(BaseASR):
             self.frames.extend([np.zeros(self.chunk, dtype=np.float32)] * self.stride_left_size)
 
         # create wav2vec model
-        print(f'[INFO] loading ASR model {self.opt.asr_model}...')
-        if 'hubert' in self.opt.asr_model:
-            self.processor = Wav2Vec2Processor.from_pretrained(opt.asr_model)
-            self.model = HubertModel.from_pretrained(opt.asr_model).to(self.device) 
-        else:   
-            self.processor = AutoProcessor.from_pretrained(opt.asr_model)
-            self.model = AutoModelForCTC.from_pretrained(opt.asr_model).to(self.device)
+        # print(f'[INFO] loading ASR model {self.opt.asr_model}...')
+        # if 'hubert' in self.opt.asr_model:
+        #     self.processor = Wav2Vec2Processor.from_pretrained(opt.asr_model)
+        #     self.model = HubertModel.from_pretrained(opt.asr_model).to(self.device) 
+        # else:   
+        #     self.processor = AutoProcessor.from_pretrained(opt.asr_model)
+        #     self.model = AutoModelForCTC.from_pretrained(opt.asr_model).to(self.device)
+        self.processor = audio_processor
+        self.model = audio_model
 
         # the extracted features 
         # use a loop queue to efficiently record endless features: [f--t---][-------][-------]
@@ -60,20 +76,20 @@ class NerfASR(BaseASR):
         # warm up steps needed: mid + right + window_size + attention_size
         self.warm_up_steps = self.context_size + self.stride_left_size + self.stride_right_size #+ self.stride_left_size   #+ 8 + 2 * 3
 
-    def get_audio_frame(self):         
-        try:
-            frame = self.queue.get(block=False)
-            type = 0
-            #print(f'[INFO] get frame {frame.shape}')
-        except queue.Empty:
-            if self.parent and self.parent.curr_state > 1: #播放自定义音频
-                frame = self.parent.get_audio_stream(self.parent.curr_state)
-                type = self.parent.curr_state
-            else:
-                frame = np.zeros(self.chunk, dtype=np.float32)
-                type = 1
+    # def get_audio_frame(self):         
+    #     try:
+    #         frame = self.queue.get(block=False)
+    #         type = 0
+    #         #print(f'[INFO] get frame {frame.shape}')
+    #     except queue.Empty:
+    #         if self.parent and self.parent.curr_state>1: #播放自定义音频
+    #             frame = self.parent.get_audio_stream(self.parent.curr_state)
+    #             type = self.parent.curr_state
+    #         else:
+    #             frame = np.zeros(self.chunk, dtype=np.float32)
+    #             type = 1
 
-        return frame, type
+    #     return frame,type
 
     def get_next_feat(self): #get audio embedding to nerf
         # return a [1/8, 16] window, for the next input to nerf side.
@@ -116,10 +132,10 @@ class NerfASR(BaseASR):
     def run_step(self):
 
         # get a frame of audio
-        frame, type = self.get_audio_frame()
+        frame,type,eventpoint = self.get_audio_frame()
         self.frames.append(frame)
         # put to output
-        self.output_queue.put((frame, type))
+        self.output_queue.put((frame,type,eventpoint))
         # context not enough, do not run network.
         if len(self.frames) < self.stride_left_size + self.context_size + self.stride_right_size:
             return
